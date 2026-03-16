@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yu-Gi-Oh! Deck Builder IA</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a22;
+      --surface2: #22222e;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.15);
+      --text: #e8e6f0;
+      --text2: #9d9ab0;
+      --text3: #5c5a6e;
+      --accent: #7c6af5;
+      --accent-hover: #9b8df8;
+      --accent-bg: rgba(124,106,245,0.12);
+      --gold: #d4a843;
+      --gold-bg: rgba(212,168,67,0.1);
+      --green: #4ade80;
+      --green-bg: rgba(74,222,128,0.1);
+      --red: #f87171;
+      --red-bg: rgba(248,113,113,0.1);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      width: 32px; height: 32px;
+      background: var(--accent-bg);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+    header p { font-size: 13px; color: var(--text2); margin-top: 1px; }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+    .api-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .api-section label { font-size: 13px; color: var(--text2); white-space: nowrap; }
+    .api-section input {
+      flex: 1; min-width: 220px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    .api-section input:focus { border-color: var(--accent); }
+    .api-section a { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+    .api-section a:hover { color: var(--accent-hover); }
+    #key-saved { font-size: 12px; color: var(--green); display: none; }
+
+    .tabs { display: flex; gap: 6px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .tab {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .tab:hover { border-color: var(--border2); color: var(--text); }
+    .tab.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-hover); }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-grid.full { grid-template-columns: 1fr; }
+    @media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 5px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 72px; }
+    .field select { cursor: pointer; }
+
+    .btn-generate {
+      width: 100%;
+      padding: 11px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background .15s, transform .1s;
+    }
+    .btn-generate:hover { background: var(--accent-hover); }
+    .btn-generate:active { transform: scale(0.99); }
+    .btn-generate:disabled { background: var(--surface2); color: var(--text3); cursor: not-allowed; transform: none; }
+
+    .file-drop {
+      border: 1px dashed var(--border2);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 13px;
+      transition: all .15s;
+    }
+    .file-drop:hover { border-color: var(--accent); background: var(--accent-bg); color: var(--text); }
+    .file-drop input { display: none; }
+    .hint { font-size: 12px; color: var(--text3); margin-top: 5px; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-gold { background: var(--gold-bg); color: var(--gold); }
+    .badge-accent { background: var(--accent-bg); color: var(--accent-hover); }
+
+    .loading {
+      text-align: center;
+      padding: 2.5rem;
+      color: var(--text2);
+      font-size: 14px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 22px; height: 22px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error {
+      background: var(--red-bg);
+      border: 1px solid rgba(248,113,113,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--red);
+      margin-top: 8px;
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .result-card h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--gold);
+    }
+
+    .result-card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 1.25rem 0 0.6rem;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-card p {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.75;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.5rem; }
+    .card-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-pill .qty {
+      background: var(--accent-bg);
+      color: var(--accent-hover);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .deck-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 1rem;
+    }
+    .stat {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat .num { font-size: 22px; font-weight: 700; color: var(--accent-hover); }
+    .stat .lbl { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+    .section-divider { height: 1px; background: var(--border); margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">☽</div>
+  <div>
+    <h1>Yu-Gi-Oh! Deck Builder IA</h1>
+    <p>Générez des decks optimisés avec Claude</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="api-section">
+    <label>Clé API Anthropic :</label>
+    <input type="password" id="apikey" placeholder="sk-ant-api03-..." />
+    <button onclick="saveKey()" style="padding:7px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;font-family:inherit">Sauvegarder</button>
+    <span id="key-saved">✓ Clé sauvegardée</span>
+    <a href="https://console.anthropic.com/settings/keys" target="_blank">Obtenir une clé →</a>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('archetype', this)">⚔ Par archétype</button>
+    <button class="tab" onclick="switchTab('mechanic', this)">⚙ Par mécanique</button>
+    <button class="tab" onclick="switchTab('collection', this)">📦 Ma collection</button>
+  </div>
+
+  <!-- ONGLET ARCHÉTYPE -->
+  <div id="tab-archetype" class="panel active">
+    <div class="card">
+      <div class="form-grid full" style="margin-bottom:12px">
+        <div class="field">
+          <label>Archétype</label>
+          <input type="text" id="arch-name" placeholder="Ex : Snake-Eye, Branded, Tearlaments, Purrely, Labrynth..." />
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Format</label>
+          <select id="arch-format">
+            <option value="TCG">TCG</option>
+            <option value="OCG">OCG</option>
+            <option value="Master Duel">Master Duel</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Style de jeu</label>
+          <select id="arch-style">
+            <option value="compétitif">Compétitif (max power)</option>
+            <option value="casual">Casual / Fun</option>
+            <option value="budget">Budget (moins de 100€)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Remarques (optionnel)</label>
+          <textarea id="arch-notes" placeholder="Ex : je veux éviter les handtraps, j'ai pas encore Apollousa, je veux un plan B..."></textarea>
+        </div>
+      </div>
+      <button class="btn-generate" id="btn-arch" onclick="buildArchetypeDeck()">Générer le deck ⟶</button>
+    </div>
+    <div id="result-archetype"></div>
+  </div>
+
+  <!-- ONGLET MÉCANIQUE -->
+  <div id="tab-mechanic" class="panel">
+    <div class="card">
+      <div class="form-grid full" style="margin-bottom:12px">
+        <div class="field">
+          <label>Décris le style de jeu que tu aimes</label>
+          <textarea id="mech-desc" style="min-height:90px" placeholder="Ex : j'adore les decks qui font pleins de synchros, qui ont un plan de jeu sur plusieurs tours, qui peuvent faire un board de 4-5 négations, ou j'aime les loops qui OTK en un tour..."></textarea>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Format</label>
+          <select id="mech-format">
+            <option value="TCG">TCG</option>
+            <option value="OCG">OCG</option>
+            <option value="Master Duel">Master Duel</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Budget</label>
+          <select id="mech-budget">
+            <option value="sans limite">Sans limite</option>
+            <option value="moins de 300€">Moins de 300€</option>
+            <option value="moins de 100€">Moins de 100€</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-generate" id="btn-mech" onclick="buildMechanicDeck()">Trouver l'archétype idéal + deck ⟶</button>
+    </div>
+    <div id="result-mechanic"></div>
+  </div>
+
+  <!-- ONGLET COLLECTION -->
+  <div id="tab-collection" class="panel">
+    <div class="card">
+      <div class="field" style="margin-bottom:12px">
+        <label>Importer ta collection</label>
+        <div class="file-drop" onclick="document.getElementById('csv-input').click()">
+          <input type="file" id="csv-input" accept=".csv,.txt,.ydk" onchange="loadFile(this)">
+          <span id="file-label">Clique ici ou glisse ton fichier</span><br>
+          <small style="font-size:12px;color:var(--text3)">CSV, TXT ou YDK (YGOPro)</small>
+        </div>
+        <p class="hint">Format CSV/TXT : une carte par ligne — "Dark Magician x3" ou juste "Dark Magician"</p>
+        <div id="col-preview" style="margin-top:8px;font-size:13px;color:var(--text2)"></div>
+      </div>
+      <div class="section-divider"></div>
+      <div class="form-grid full" style="margin-bottom:12px">
+        <div class="field">
+          <label>Instructions</label>
+          <textarea id="col-notes" placeholder="Ex : je veux un deck contrôle, joue autour de Snake-Eye si possible, évite les cartes chères..."></textarea>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Format</label>
+          <select id="col-format">
+            <option value="TCG">TCG</option>
+            <option value="OCG">OCG</option>
+            <option value="Master Duel">Master Duel</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Style</label>
+          <select id="col-style">
+            <option value="compétitif">Compétitif</option>
+            <option value="casual">Casual</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-generate" id="btn-col" onclick="buildCollectionDeck()">Construire depuis ma collection ⟶</button>
+    </div>
+    <div id="result-collection"></div>
+  </div>
+
+</div>
+
+<script>
+let collectionCards = [];
+let savedApiKey = '';
+
+function saveKey() {
+  const k = document.getElementById('apikey').value.trim();
+  if (k) {
+    savedApiKey = k;
+    const s = document.getElementById('key-saved');
+    s.style.display = 'inline';
+    setTimeout(() => s.style.display = 'none', 2500);
+  }
+}
+
+function getKey() {
+  return savedApiKey || document.getElementById('apikey').value.trim();
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    collectionCards = parseCollection(e.target.result, file.name);
+    document.getElementById('col-preview').innerHTML =
+      '<span class="badge badge-green">' + collectionCards.length + ' cartes chargées</span> — ' +
+      collectionCards.slice(0, 6).map(c => c.name).join(', ') + (collectionCards.length > 6 ? '...' : '');
+    document.getElementById('file-label').textContent = file.name + ' (' + collectionCards.length + ' cartes)';
+  };
+  reader.readAsText(file);
+}
+
+function parseCollection(text, filename) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !l.startsWith('!'));
+  const cards = [];
+  for (const line of lines) {
+    if (filename.endsWith('.ydk') && /^\d+$/.test(line)) {
+      cards.push({ name: 'ID:' + line, qty: 1 });
+      continue;
+    }
+    const m = line.match(/^(.+?)\s*[xX×]\s*(\d+)$/) || line.match(/^(\d+)\s*[xX×]\s*(.+)$/);
+    if (m) {
+      const name = isNaN(m[1]) ? m[1].trim() : m[2].trim();
+      const qty = isNaN(m[1]) ? parseInt(m[2]) : parseInt(m[1]);
+      cards.push({ name, qty: qty || 1 });
+    } else if (line.length > 1) {
+      cards.push({ name: line, qty: 1 });
+    }
+  }
+  return cards;
+}
+
+function setLoading(resultId, btnId) {
+  document.getElementById(btnId).disabled = true;
+  document.getElementById(resultId).innerHTML =
+    '<div class="loading"><span class="spinner"></span>L\'IA construit ton deck, patience...</div>';
+}
+
+function showError(resultId, btnId, msg) {
+  document.getElementById(btnId).disabled = false;
+  document.getElementById(resultId).innerHTML = '<div class="error">' + msg + '</div>';
+}
+
+function renderResult(resultId, btnId, raw) {
+  document.getElementById(btnId).disabled = false;
+
+  const sections = raw.split(/\n(?=##\s)/);
+  let mainCount = 0, extraCount = 0, sideCount = 0;
+
+  let html = '<div class="result-card">';
+
+  for (const sec of sections) {
+    const lines = sec.split('\n');
+    const titleRaw = lines[0].replace(/^#+\s*/, '').trim();
+    const body = lines.slice(1).join('\n').trim();
+    const titleLow = titleRaw.toLowerCase();
+
+    if (titleLow.includes('présentation') || titleLow.includes('presentation')) {
+      html += '<h2>' + titleRaw + '</h2><p>' + body.replace(/\n/g, '<br>') + '</p>';
+    } else if (titleLow.includes('main deck') || titleLow.includes('main (')) {
+      const cards = parseCardList(body);
+      mainCount = cards.reduce((s, c) => s + c.qty, 0);
+      html += '<h3>Main deck <span class="badge badge-accent" style="font-size:11px;vertical-align:middle">' + mainCount + ' cartes</span></h3>';
+      html += '<div class="card-list">' + renderPills(cards) + '</div>';
+    } else if (titleLow.includes('extra deck') || titleLow.includes('extra (')) {
+      const cards = parseCardList(body);
+      extraCount = cards.reduce((s, c) => s + c.qty, 0);
+      html += '<h3>Extra deck <span class="badge badge-gold" style="font-size:11px;vertical-align:middle">' + extraCount + ' cartes</span></h3>';
+      html += '<div class="card-list">' + renderPills(cards) + '</div>';
+    } else if (titleLow.includes('side deck') || titleLow.includes('side (')) {
+      const cards = parseCardList(body);
+      sideCount = cards.reduce((s, c) => s + c.qty, 0);
+      html += '<h3>Side deck <span class="badge badge-accent" style="font-size:11px;vertical-align:middle;opacity:0.7">' + sideCount + ' cartes</span></h3>';
+      html += '<div class="card-list">' + renderPills(cards) + '</div>';
+    } else if (titleLow.includes('combo')) {
+      html += '<h3>' + titleRaw + '</h3><p style="font-size:14px;line-height:1.8;color:var(--text2)">' + body.replace(/\n/g, '<br>') + '</p>';
+    } else if (titleRaw) {
+      html += '<h3>' + titleRaw + '</h3><p style="font-size:14px;line-height:1.8;color:var(--text2)">' + body.replace(/\n/g, '<br>') + '</p>';
+    }
+  }
+  html += '</div>';
+  document.getElementById(resultId).innerHTML = html;
+}
+
+function parseCardList(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  const cards = [];
+  for (const line of lines) {
+    const clean = line.replace(/^[-•*]\s*/, '').trim();
+    const m = clean.match(/^(.+?)\s*[xX×]\s*(\d+)$/) || clean.match(/^(\d+)\s*[xX×]\s*(.+)$/);
+    if (m) {
+      const name = isNaN(m[1]) ? m[1].trim() : m[2].trim();
+      const qty = isNaN(m[1]) ? parseInt(m[2]) : parseInt(m[1]);
+      if (name) cards.push({ name, qty: qty || 1 });
+    } else if (clean.length > 1) {
+      cards.push({ name: clean, qty: 1 });
+    }
+  }
+  return cards;
+}
+
+function renderPills(cards) {
+  return cards.map(c =>
+    '<span class="card-pill">' + c.name + (c.qty > 1 ? '<span class="qty">×' + c.qty + '</span>' : '') + '</span>'
+  ).join('');
+}
+
+async function callAPI(prompt, resultId, btnId) {
+  const key = getKey();
+  if (!key) {
+    showError(resultId, btnId, 'Entre ta clé API Anthropic en haut de la page.');
+    return;
+  }
+  setLoading(resultId, btnId);
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: key, prompt })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Erreur inconnue');
+    renderResult(resultId, btnId, data.result);
+  } catch (err) {
+    showError(resultId, btnId, 'Erreur : ' + err.message);
+  }
+}
+
+async function buildArchetypeDeck() {
+  const name = document.getElementById('arch-name').value.trim();
+  if (!name) return showError('result-archetype', 'btn-arch', 'Entre un archétype.');
+  const format = document.getElementById('arch-format').value;
+  const style = document.getElementById('arch-style').value;
+  const notes = document.getElementById('arch-notes').value.trim();
+  const prompt = `Construis un deck Yu-Gi-Oh! complet pour l'archétype "${name}".
+Format : ${format} | Style : ${style}
+${notes ? 'Notes du joueur : ' + notes : ''}
+Main deck 40 cartes, extra deck 15, side deck 15. Respecte la banlist ${format} actuelle.`;
+  await callAPI(prompt, 'result-archetype', 'btn-arch');
+}
+
+async function buildMechanicDeck() {
+  const desc = document.getElementById('mech-desc').value.trim();
+  if (!desc) return showError('result-mechanic', 'btn-mech', 'Décris ta mécanique préférée.');
+  const format = document.getElementById('mech-format').value;
+  const budget = document.getElementById('mech-budget').value;
+  const prompt = `Un joueur Yu-Gi-Oh! décrit son style de jeu préféré : "${desc}"
+Format : ${format} | Budget : ${budget}
+Recommande l'archétype le plus adapté et construis un deck complet. Explique dans la Présentation pourquoi cet archétype correspond parfaitement à la demande.`;
+  await callAPI(prompt, 'result-mechanic', 'btn-mech');
+}
+
+async function buildCollectionDeck() {
+  if (!collectionCards.length) return showError('result-collection', 'btn-col', 'Importe ta collection d\'abord.');
+  const notes = document.getElementById('col-notes').value.trim();
+  const format = document.getElementById('col-format').value;
+  const style = document.getElementById('col-style').value;
+  const cardList = collectionCards.map(c => c.qty > 1 ? c.name + ' x' + c.qty : c.name).join('\n');
+  const prompt = `Voici la collection Yu-Gi-Oh! d'un joueur :
+${cardList}
+
+Construis le meilleur deck possible en utilisant UNIQUEMENT ces cartes.
+Format : ${format} | Style : ${style}
+${notes ? 'Instructions : ' + notes : ''}
+Si une carte dépasse la limite banlist, ajuste la quantité. Explique tes choix.`;
+  await callAPI(prompt, 'result-collection', 'btn-col');
+}
+</script>
+
+</body>
+</html>
